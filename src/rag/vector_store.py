@@ -43,7 +43,11 @@ class VectorStoreManager:
                 f"Qdrant server at {self.url} is not reachable. "
                 f"Falling back to local disk storage at {self.local_path}"
             )
-            return QdrantClient(path=self.local_path)
+            try:
+                return QdrantClient(path=self.local_path)
+            except Exception as err:
+                logger.warning(f"Local storage locked or inaccessible ({err}). Using in-memory Qdrant fallback.")
+                return QdrantClient(":memory:")
 
     def ensure_collection(self, vector_size: int = 384):
         """Membuat koleksi jika belum ada."""
