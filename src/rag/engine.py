@@ -27,11 +27,12 @@ class DoCareRAGEngine:
 Tone: {tone}.
 
 Rules for responding:
-1. Start your response with: "Terima kasih telah berkonsultasi dengan DoCare AI." (or "Thank you for consulting with DoCare AI" if query is in English).
-2. Answer clearly and informatively in the same language as the user's query (Bahasa Indonesia / English).
-3. Base your health information strictly on the provided medical references below. If the provided reference does not directly answer the specific condition, clearly state "Ini adalah informasi rujukan terbaik yang kami temukan" and do NOT make up or fabricate medical diagnoses.
-4. Always advise consulting a licensed physician for definitive medical diagnoses and treatment plans.
-5. End your response with: "Semoga informasi ini bermanfaat, lekas sembuh, dan terima kasih." (or "Hope this information helps, wish you a speedy recovery, and thank you" in English).
+1. Always respond in the same language as the user's message (default to Bahasa Indonesia for Indonesian greetings/questions).
+2. If the user sends a greeting or introductory message (e.g., "halo", "hai", "selamat pagi/siang/malam", "kamu siapa"), warmly introduce yourself as DoCare AI, and politely invite them to share their health symptoms, questions, or concerns.
+3. For medical inquiries, start with: "Terima kasih telah berkonsultasi dengan DoCare AI." (or "Thank you for consulting with DoCare AI" in English).
+4. Base your health information strictly on the verified medical references below whenever applicable. If the reference is not relevant to their specific condition, state it politely and never fabricate medical diagnoses.
+5. Always advise consulting a licensed physician for definitive medical diagnoses and treatment plans.
+6. For medical advice, end with: "Semoga informasi ini bermanfaat, lekas sembuh, dan terima kasih." (or "Hope this information helps, wish you a speedy recovery, and thank you" in English).
 
 Verified Medical References (MedQuAD Dataset):
 {context_text}
@@ -122,7 +123,7 @@ Verified Medical References (MedQuAD Dataset):
                     messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
             messages.append({"role": "user", "content": query})
 
-            client = ollama.Client(host=settings.OLLAMA_HOST, timeout=2.0)
+            client = ollama.Client(host=settings.OLLAMA_HOST, timeout=60.0)
             res = client.chat(
                 model=settings.OLLAMA_MODEL,
                 messages=messages,
@@ -130,7 +131,7 @@ Verified Medical References (MedQuAD Dataset):
             )
             return res["message"]["content"]
         except Exception as e:
-            logger.info(f"Ollama offline/tidak tersedia ({e}), menggunakan RAG synthesizer bawaan.")
+            logger.info(f"Ollama error/timeout ({e}), menggunakan RAG synthesizer bawaan.")
 
         # Fallback RAG Synthesis jika Ollama tidak sedang aktif di komputer pengguna
         # Tetap mengikuti aturan DoCare AI prompt
@@ -138,8 +139,22 @@ Verified Medical References (MedQuAD Dataset):
 
     def _synthesize_rag_fallback(self, query: str, system_prompt: str) -> str:
         """Fallback aman jika server Ollama belum di-start oleh pengguna."""
-        is_id = any(w in query.lower() for w in ["saya", "apa", "gejala", "apakah", "sakit", "obat", "bagaimana"])
+        q_lower = query.lower()
+        is_greeting = any(w in q_lower for w in ["halo", "hai", "hei", "pagi", "siang", "malam", "sore", "kamu", "assalamu"])
+        is_id = is_greeting or any(w in q_lower for w in ["saya", "apa", "gejala", "apakah", "sakit", "obat", "bagaimana", "tolong", "bisa"])
         
+        if is_greeting:
+            if is_id:
+                return (
+                    "Halo! Saya **DoCare AI**, asisten pendamping kesehatan digital Anda. 🩺\n\n"
+                    "Ada keluhan kesehatan, gejala yang sedang Anda rasakan, atau informasi medis yang ingin Anda tanyakan hari ini?"
+                )
+            else:
+                return (
+                    "Hello! I am **DoCare AI**, your digital healthcare companion. 🩺\n\n"
+                    "How can I assist you with your health symptoms or medical inquiries today?"
+                )
+
         greeting = (
             "Terima kasih telah berkonsultasi dengan DoCare AI.\n\n"
             if is_id else
