@@ -5,10 +5,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env if present
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Load .env if present
+load_dotenv(BASE_DIR / ".env", override=True)
 
 class Settings:
     PROJECT_NAME: str = "DoCare AI"
