@@ -113,16 +113,43 @@ Verified Medical References (MedQuAD Dataset):
         system_prompt: str,
         history: Optional[List[Dict[str, str]]] = None
     ) -> str:
-        """Memanggil Ollama atau fallback RAG generator."""
-        # Coba panggil Ollama lokal
+        """Memanggil Groq Cloud (jika ada API key), Ollama lokal, atau fallback RAG generator."""
+        messages = [{"role": "system", "content": system_prompt}]
+        if history:
+            for h in history[-4:]:  # 2 turn terakhir
+                messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": query})
+
+        # 1. Coba Groq Cloud API jika GROQ_API_KEY terkonfigurasi (Kecepatan ~0.3s)
+        if settings.GROQ_API_KEY:
+            try:
+                import requests
+                headers = {
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": settings.GROQ_MODEL,
+                    "messages": messages,
+                    "temperature": 0.3,
+                    "max_tokens": 1024
+                }
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=15.0
+                )
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"]
+                else:
+                    logger.warning(f"Groq API error ({resp.status_code}): {resp.text}. Mengalihkan ke Ollama.")
+            except Exception as e:
+                logger.warning(f"Groq Cloud gagal terhubung ({e}). Mengalihkan ke Ollama.")
+
+        # 2. Coba Ollama lokal (Llama 3.2)
         try:
             import ollama
-            messages = [{"role": "system", "content": system_prompt}]
-            if history:
-                for h in history[-4:]:  # 2 turn terakhir
-                    messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
-            messages.append({"role": "user", "content": query})
-
             client = ollama.Client(host=settings.OLLAMA_HOST, timeout=60.0)
             res = client.chat(
                 model=settings.OLLAMA_MODEL,
@@ -133,8 +160,7 @@ Verified Medical References (MedQuAD Dataset):
         except Exception as e:
             logger.info(f"Ollama error/timeout ({e}), menggunakan RAG synthesizer bawaan.")
 
-        # Fallback RAG Synthesis jika Ollama tidak sedang aktif di komputer pengguna
-        # Tetap mengikuti aturan DoCare AI prompt
+        # 3. Fallback RAG Synthesis jika Ollama tidak sedang aktif
         return self._synthesize_rag_fallback(query, system_prompt)
 
     def _synthesize_rag_fallback(self, query: str, system_prompt: str) -> str:

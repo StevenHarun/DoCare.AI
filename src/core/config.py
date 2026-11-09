@@ -35,9 +35,11 @@ class Settings:
     RETRIEVAL_TOP_K: int = int(os.getenv("RETRIEVAL_TOP_K", "3"))
     SIMILARITY_THRESHOLD: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.45"))
 
-    # LLM Settings (Ollama)
+    # LLM Settings (Ollama & Groq Cloud Acceleration)
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.2-3b-preview")
 
     # Emergency Triage
     EMERGENCY_HOTLINE: str = os.getenv("EMERGENCY_HOTLINE", "119")

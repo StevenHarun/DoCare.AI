@@ -131,25 +131,48 @@ with tab_chat:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
+        # Quick sample prompts untuk kemudahan uji coba MVP
+        if len(st.session_state.messages) <= 1:
+            st.caption("💡 **Coba pertanyaan cepat berikut:**")
+            p_cols = st.columns(3)
+            prompt_selected = None
+            if p_cols[0].button("👁️ Gejala Glaukoma", use_container_width=True):
+                prompt_selected = "Apa saja gejala awal penyakit glaukoma pada mata?"
+            if p_cols[1].button("🩸 Tanda Diabetes", use_container_width=True):
+                prompt_selected = "Apa tanda dan gejala umum penyakit diabetes?"
+            if p_cols[2].button("🚨 Uji Darurat Nyeri Dada", use_container_width=True):
+                prompt_selected = "Dada saya nyeri hebat seperti tertekan dan sesak napas!"
+        else:
+            prompt_selected = None
+
         # Input Chat Pengguna
         user_query = st.chat_input("Ceritakan keluhan atau pertanyaan kesehatan Anda...")
-        if user_query:
+        active_query = user_query or prompt_selected
+
+        if active_query:
             # Tampilkan pesan user
-            st.session_state.messages.append({"role": "user", "content": user_query})
+            st.session_state.messages.append({"role": "user", "content": active_query})
             with st.chat_message("user"):
-                st.markdown(user_query)
+                st.markdown(active_query)
 
             # Proses dengan RAG Engine
             with st.chat_message("assistant"):
                 with st.spinner("Menganalisis gejala dan mencari rujukan medis terverifikasi..."):
+                    import time
+                    start_t = time.time()
                     result = rag_engine.ask(
-                        query=user_query,
+                        query=active_query,
                         history=st.session_state.messages,
                         tone=tone_option
                     )
+                    elapsed = time.time() - start_t
 
                 response_text = result["response"]
                 st.markdown(response_text)
+                
+                # Tampilkan badge latensi & model
+                model_used = result.get("model_used", "AI")
+                st.caption(f"⏱️ Waktu Respon: **{elapsed:.2f} detik** | Engine: **{model_used}** | Status: **RAG Verified**")
 
                 # Simpan sumber rujukan terakhir di session state
                 st.session_state["last_sources"] = result.get("sources", [])

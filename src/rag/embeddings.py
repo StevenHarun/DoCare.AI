@@ -32,16 +32,18 @@ class EmbeddingEngine:
             self._load_attempted = True
             try:
                 from sentence_transformers import SentenceTransformer
-                # Coba muat cache lokal terlebih dahulu agar tidak memblokir proses
+                # Coba muat model SentenceTransformer (akan menggunakan cache jika tersedia)
                 try:
-                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
-                    logger.info(f"Loaded local SentenceTransformer: {self.model_name}")
-                except Exception:
-                    # Jika belum ada di cache lokal, gunakan fallback deterministik yang instan
-                    logger.info("Model belum terunduh lokal. Mengaktifkan mesin embedding deterministik.")
-                    self._model = None
+                    self._model = SentenceTransformer(self.model_name)
+                    logger.info(f"Loaded SentenceTransformer: {self.model_name}")
+                except Exception as load_err:
+                    logger.warning(f"Error memuat model online/cache ({load_err}). Mencoba local_files_only...")
+                    try:
+                        self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                    except Exception:
+                        self._model = None
             except Exception as e:
-                logger.warning(f"Error memuat SentenceTransformer: {e}")
+                logger.warning(f"Error import SentenceTransformer: {e}")
                 self._model = None
         return self._model
 
